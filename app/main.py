@@ -9,7 +9,7 @@ DEBUG = 0
 
 
 class PowerstationMqtt():
-    def init(self, logger, statuslogger):
+    def init(self):
         self.powerstation_hostname = os.environ.get('powerstation_hostname','')
         self.powerstation_instance = os.environ.get('powerstation_instance','')
         
