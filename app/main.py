@@ -8,7 +8,7 @@ from time import sleep
 DEBUG = 0
 
 
-class PowerstationMqtt(Daemon):
+class PowerstationMqtt():
     def init(self, logger, statuslogger):
         self.powerstation_hostname = os.environ.get('powerstation_hostname','')
         self.powerstation_instance = os.environ.get('powerstation_instance','')
