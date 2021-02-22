@@ -46,12 +46,35 @@ class PowerstationMqtt():
         self.statuslogger = statuslogger
 
         logger.info("initialized")
-        statuslogger.info("initialized")    
+        statuslogger.info("initialized") 
+        
+    def on_message(self, client, userdata, message):
+        try:
+            if (message.topic.startswith("$SYS/")):
+                self.watchdog = 0
+            else:
+                self.watchdog = 0
+                port = message.topic.split('/')[-1]
+                value = str(message.payload.decode("utf-8"))
+                state = "0"
+
+                if value == "ON" or value == "1":
+                    state = "1"
+            
+                url = 'http://' + self.hostname + '?cmd=200&json={"port":' + port +',"state":' + state + '}' 
+                self.logger.debug(url)
+
+                requests.get(url)
+        except Exception as e:
+            self.logger.warning(e)
+            pass
+        
  
     def run(self):
         self.logger.info("running")
         self.statuslogger.info("running")
 
+        
         lastRun = datetime.datetime.utcnow()
         lastEval = datetime.datetime.utcnow()
         watt = [0.0, 0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]
@@ -61,85 +84,107 @@ class PowerstationMqtt():
         lastSentTime = datetime.datetime.fromordinal(1) 
 
         while True:
-            try:
-                while True:
-                    now = datetime.datetime.utcnow()
-                    delta = (now - lastRun).total_seconds() 
-                    if delta >= 1:
-                        lastRun = now
-                        break
-                    sleep(0.1)
+            self.watchdog = 0
+
+            sendClientId = mqtt_client_id + "Send"
+            client = mqtt.Client(client_id=sendClientId)
+            self.client = client
+            if self.mqtt_username:
+                self.logger.info("apply credentials")
+                client.username_pw_set(self.mqtt_username, self.mqtt_password)
+
+            client.reconnect_delay_set(min_delay=1, max_delay=120)
+            client.on_message = self.on_message
             
-                msgs = []
-                self.statuslogger.info("looping")
-                self.logger.debug("Requesting Data")
+            client.connect(self.mqtt_host, port=self.mqtt_port, keepalive=60, bind_address="")
+            client.loop_start()
+           
+            client.subscribe(self.mqtt_topic + "send/#")
+            client.subscribe("$SYS/#")
 
-                response = requests.get("http://" + self.powerstation_hostname + "?cmd=511", timeout=10.0)
-                now = datetime.datetime.utcnow()
-                deltaEval = (now - lastEval).total_seconds()
-                lastEval = now
-                deltaSent = (now - lastSentTime).total_seconds()
+            while self.watchdog < 300:
+                try:
+                    while True:
+                        now = datetime.datetime.utcnow()
+                        delta = (now - lastRun).total_seconds() 
+                        if delta >= 1:
+                            lastRun = now
+                            break
+                        sleep(0.1)
+                
+                    msgs = []
+                    self.statuslogger.info("looping")
+                    self.logger.debug("Requesting Data")
 
-                jsonData = response.json()
-                if 'data' not in jsonData:
-                    self.logger.warning("Data not found")
-                    break
+                    response = requests.get("http://" + self.powerstation_hostname + "?cmd=511", timeout=10.0)
+                    now = datetime.datetime.utcnow()
+                    deltaEval = (now - lastEval).total_seconds()
+                    lastEval = now
+                    deltaSent = (now - lastSentTime).total_seconds()
 
-                data = jsonData["data"]
-                self.logger.debug("Processing  Data")
-                sWatt = data["watt"]
-                rWatt = [0.0, 0.0, 0.0, 0.0, 0.0 ,0.0, 2.0]
-                rSwitch = data["switch"]
+                    jsonData = response.json()
+                    if 'data' not in jsonData:
+                        self.logger.warning("Data not found")
+                        break
 
-                for x in range(6):
-                    rWatt[x] = float(sWatt[x])
-                    kwh[x] = kwh[x] + rWatt[x] * deltaEval / 3600000.0
-                    rWatt[6] = rWatt[6] + rWatt[x]
-        
-                kwh[6] = kwh[6] + rWatt[x] * deltaEval / 3600000.0
+                    data = jsonData["data"]
+                    self.logger.debug("Processing  Data")
+                    sWatt = data["watt"]
+                    rWatt = [0.0, 0.0, 0.0, 0.0, 0.0 ,0.0, 2.0]
+                    rSwitch = data["switch"]
 
-                if deltaSent > 600:
-                    for x in range(7):
-                        topic = self.mqtt_topic + "Port" + str(x)
-                        
-                        if (x != 6):
-                            switch[x] = rSwitch[x]
-                            state = "ON"
-                            if int(switch[x]) == 0:
-                                state = "OFF"
-                            msgs.append({ "topic": topic + "/switch", "payload": state, "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                        else:
-                            topic = self.mqtt_topic + "Total"
+                    for x in range(6):
+                        rWatt[x] = float(sWatt[x])
+                        kwh[x] = kwh[x] + rWatt[x] * deltaEval / 3600000.0
+                        rWatt[6] = rWatt[6] + rWatt[x]
+            
+                    kwh[6] = kwh[6] + rWatt[x] * deltaEval / 3600000.0
 
-                        watt[x] = rWatt[x]
-                        msgs.append({ "topic": topic + "/watt", "payload": watt[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                        kwhSent[x] = kwh[x]
-                        msgs.append({ "topic": topic + "/kWh", "payload": kwhSent[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                    lastSentTime = now
-                else:
-                    for x in range(7):
-                        topic = self.mqtt_topic + "Port" + str(x)
-                        if (x != 6):
-                            if switch[x] != rSwitch[x]:
+                    if deltaSent > 600:
+                        for x in range(7):
+                            topic = self.mqtt_topic + "Port" + str(x)
+                            
+                            if (x != 6):
                                 switch[x] = rSwitch[x]
                                 state = "ON"
                                 if int(switch[x]) == 0:
                                     state = "OFF"
                                 msgs.append({ "topic": topic + "/switch", "payload": state, "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                        else:
-                            topic = self.mqtt_topic + "Total"
-                        if abs(watt[x] - rWatt[x]) >= 0.5:
+                            else:
+                                topic = self.mqtt_topic + "Total"
+
                             watt[x] = rWatt[x]
                             msgs.append({ "topic": topic + "/watt", "payload": watt[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                        if abs(kwh[x] - kwhSent[x]) >= 0.01:
                             kwhSent[x] = kwh[x]
                             msgs.append({ "topic": topic + "/kWh", "payload": kwhSent[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
-                
-                if len(msgs) > 0:
-                    publish.multiple(msgs, hostname=self.mqtt_host, port=self.mqtt_port, client_id=self.mqtt_client_id, auth=self.mqtt_auth)
-            except Exception as e:
-                self.logger.warning(e)
-                pass
+                        lastSentTime = now
+                    else:
+                        for x in range(7):
+                            topic = self.mqtt_topic + "Port" + str(x)
+                            if (x != 6):
+                                if switch[x] != rSwitch[x]:
+                                    switch[x] = rSwitch[x]
+                                    state = "ON"
+                                    if int(switch[x]) == 0:
+                                        state = "OFF"
+                                    msgs.append({ "topic": topic + "/switch", "payload": state, "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                            else:
+                                topic = self.mqtt_topic + "Total"
+                            if abs(watt[x] - rWatt[x]) >= 0.5:
+                                watt[x] = rWatt[x]
+                                msgs.append({ "topic": topic + "/watt", "payload": watt[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                            if abs(kwh[x] - kwhSent[x]) >= 0.01:
+                                kwhSent[x] = kwh[x]
+                                msgs.append({ "topic": topic + "/kWh", "payload": kwhSent[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                    
+                    if len(msgs) > 0:
+                        publish.multiple(msgs, hostname=self.mqtt_host, port=self.mqtt_port, client_id=self.mqtt_client_id, auth=self.mqtt_auth)
+                except Exception as e:
+                    self.logger.warning(e)
+                    pass
+
+            self.logger.warning("watchdog triggered, restarting mqtt")
+            client.disconnect()
 
 
 d = PowerstationMqtt()
