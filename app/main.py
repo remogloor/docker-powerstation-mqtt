@@ -86,7 +86,7 @@ class PowerstationMqtt():
         while True:
             self.watchdog = 0
 
-            sendClientId = mqtt_client_id + "Send"
+            sendClientId = self.mqtt_client_id + "Send"
             client = mqtt.Client(client_id=sendClientId)
             self.client = client
             if self.mqtt_username:
