@@ -1,5 +1,6 @@
 import sys, os, requests, datetime, re, logging, logging.handlers
 import paho.mqtt.publish as publish
+import paho.mqtt.client as mqtt
 import pytz
 import configparser
 from time import sleep
