@@ -62,7 +62,7 @@ class PowerstationMqtt():
                 if value == "ON" or value == "1":
                     state = "1"
             
-                url = 'http://' + self.hostname + '?cmd=200&json={"port":' + port +',"state":' + state + '}' 
+                url = 'http://' + self.powerstation_hostname + '?cmd=200&json={"port":' + port +',"state":' + state + '}' 
                 self.logger.debug(url)
 
                 requests.get(url)
@@ -101,9 +101,9 @@ class PowerstationMqtt():
             client.loop_start()
            
             client.subscribe(self.mqtt_topic + "send/#")
-            client.subscribe("$SYS/#")
+            client.subscribe("$SYS/broker/uptime")
 
-            while self.watchdog < 300:
+            while self.watchdog < 60:
                 try:
                     while True:
                         now = datetime.datetime.utcnow()
