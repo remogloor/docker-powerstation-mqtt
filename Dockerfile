@@ -20,6 +20,10 @@ COPY --from=builder /install /usr/local
 WORKDIR /app
 ADD app /app
 
+# Switching to a non-root user, please refer to https://aka.ms/vscode-docker-python-user-rights
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
+USER appuser
+
 RUN chmod 755 /app/healthcheck.sh
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
