@@ -25,7 +25,7 @@ ENV GID=1000
 ENV USER=appuser
 ENV GROUP=appgroup
 
-RUN addgroup -g $GID $GROUP && adduser -G $GROUP -u $UID $USER && chown -R $USER:$GROUP /app
+RUN addgroup -g $GID -S $GROUP && adduser -G $GROUP -u $UID -S $USER && chown -R $USER:$GROUP /app
 USER $USER
 
 RUN chmod 755 /app/healthcheck.sh
