@@ -90,6 +90,7 @@ class PowerstationMqtt():
             sendClientId = self.mqtt_client_id + "Send"
             client = mqtt.Client(client_id=sendClientId)
             self.client = client
+            client.enable_logger(logger=self.logger)
             if self.mqtt_username:
                 self.logger.info("apply credentials")
                 client.username_pw_set(self.mqtt_username, self.mqtt_password)
@@ -100,8 +101,8 @@ class PowerstationMqtt():
             client.connect(self.mqtt_host, port=self.mqtt_port, keepalive=60, bind_address="")
             client.loop_start()
            
-            client.subscribe(self.mqtt_topic + "send/#")
-            client.subscribe("$SYS/broker/uptime")
+            client.subscribe(self.mqtt_topic + "send/#", qos=1)
+            client.subscribe("$SYS/broker/uptime", qos=1)
 
             while self.watchdog < 60:
                 try:
@@ -113,7 +114,6 @@ class PowerstationMqtt():
                             break
                         sleep(0.1)
                 
-                    msgs = []
                     self.statuslogger.info("looping")
                     self.logger.debug("Requesting Data")
 
@@ -150,14 +150,14 @@ class PowerstationMqtt():
                                 state = "ON"
                                 if int(switch[x]) == 0:
                                     state = "OFF"
-                                msgs.append({ "topic": topic + "/switch", "payload": state, "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                                self.client.publish(topic + "/switch", payload=state, qos=self.mqtt_qos, retain=self.mqtt_retain)
                             else:
                                 topic = self.mqtt_topic + "Total"
 
                             watt[x] = rWatt[x]
-                            msgs.append({ "topic": topic + "/watt", "payload": watt[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                            self.client.publish(topic + "/watt", payload=watt[x], qos=self.mqtt_qos, retain=self.mqtt_retain)
                             kwhSent[x] = kwh[x]
-                            msgs.append({ "topic": topic + "/kWh", "payload": kwhSent[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                            self.client.publish(topic + "/kWh", payload=kwhSent[x], qos=self.mqtt_qos, retain=self.mqtt_retain)
                         lastSentTime = now
                     else:
                         for x in range(7):
@@ -168,18 +168,16 @@ class PowerstationMqtt():
                                     state = "ON"
                                     if int(switch[x]) == 0:
                                         state = "OFF"
-                                    msgs.append({ "topic": topic + "/switch", "payload": state, "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                                    self.client.publish(topic + "/switch", payload=state, qos=self.mqtt_qos, retain=self.mqtt_retain)
                             else:
                                 topic = self.mqtt_topic + "Total"
                             if abs(watt[x] - rWatt[x]) >= 0.5:
                                 watt[x] = rWatt[x]
-                                msgs.append({ "topic": topic + "/watt", "payload": watt[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                                self.client.publish(topic + "/watt", payload=watt[x], qos=self.mqtt_qos, retain=self.mqtt_retain)
                             if abs(kwh[x] - kwhSent[x]) >= 0.01:
                                 kwhSent[x] = kwh[x]
-                                msgs.append({ "topic": topic + "/kWh", "payload": kwhSent[x], "qos": self.mqtt_qos, "retain": self.mqtt_retain })
+                                self.client.publish(topic + "/kWh", payload=kwhSent[x], qos=self.mqtt_qos, retain=self.mqtt_retain)
                     
-                    if len(msgs) > 0:
-                        publish.multiple(msgs, hostname=self.mqtt_host, port=self.mqtt_port, client_id=self.mqtt_client_id, auth=self.mqtt_auth)
                 except Exception as e:
                     self.logger.warning(e)
                     pass
