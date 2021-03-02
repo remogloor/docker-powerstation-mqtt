@@ -105,6 +105,7 @@ class PowerstationMqtt():
             client.subscribe("$SYS/broker/uptime", qos=1)
 
             while self.watchdog < 60:
+                self.watchdog = self.watchdog + 1
                 try:
                     while True:
                         now = datetime.datetime.utcnow()
