@@ -139,7 +139,6 @@ class PowerstationMqtt():
                     sWatt = data["watt"]
                     rWatt = [0.0, 0.0, 0.0, 0.0, 0.0 ,0.0, 2.0]
                     rSwitch = data["switch"]
-                    rDivisor = 
 
                     for x in range(6):
                         rWatt[x] = float(sWatt[x]) / self.powerstation_divisor;
