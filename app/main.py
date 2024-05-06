@@ -14,7 +14,7 @@ class PowerstationMqtt():
         self.powerstation_hostname = os.environ.get('powerstation_hostname','')
         self.powerstation_instance = os.environ.get('powerstation_instance','')
         self.powerstation_milliwatt = os.environ.get('powerstation_milliwatt', '')
-        if self.powerstation_milliwatt == 'true'
+        if self.powerstation_milliwatt == 'true':
             self.powerstation_divisor = 1000.0
         else:
             self.powerstation_divisor = 1.0
