@@ -13,6 +13,11 @@ class PowerstationMqtt():
     def init(self):
         self.powerstation_hostname = os.environ.get('powerstation_hostname','')
         self.powerstation_instance = os.environ.get('powerstation_instance','')
+        self.powerstation_milliwatt = os.environ.get('powerstation_milliwatt', '')
+        if self.powerstation_milliwatt == 'true'
+            self.powerstation_divisor = 1000.0
+        else:
+            self.powerstation_divisor = 1.0
         
         self.mqtt_client_id = os.environ.get('mqtt_client_id','')
         self.mqtt_host = os.environ.get('mqtt_client_host','')
@@ -134,9 +139,10 @@ class PowerstationMqtt():
                     sWatt = data["watt"]
                     rWatt = [0.0, 0.0, 0.0, 0.0, 0.0 ,0.0, 2.0]
                     rSwitch = data["switch"]
+                    rDivisor = 
 
                     for x in range(6):
-                        rWatt[x] = float(sWatt[x])
+                        rWatt[x] = float(sWatt[x]) / self.powerstation_divisor;
                         kwh[x] = kwh[x] + rWatt[x] * deltaEval / 3600000.0
                         rWatt[6] = rWatt[6] + rWatt[x]
             
